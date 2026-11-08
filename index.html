@@ -26,6 +26,9 @@ h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;
 .bar i.off{background:var(--off)}.bar i.maybe{background:var(--maybe)}
 .bar i.now{box-shadow:inset 0 0 0 2px var(--danger)}
 .ticks{display:grid;grid-template-columns:repeat(4,1fr);color:var(--muted);font-size:11px;margin-top:3px}
+.ver{margin-top:8px}.ver.old .bar{opacity:.5}
+.vl{font-size:12px;color:var(--muted);margin-bottom:4px}.vl b{color:var(--ink)}.vl .cm{color:var(--accent)}
+.bar i.chg{box-shadow:inset 0 3px 0 var(--accent)}
 ul{list-style:none;margin:10px 0 0;padding:0}
 li{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
 li.past{opacity:.4}
@@ -136,6 +139,7 @@ function readConfig(){
   }catch(e){ return {...DEFAULTS}; }
 }
 let cfg = readConfig(), data = null;
+const HIST = cfg._h || {}; delete cfg._h; // історія версій графіка від бота
 
 // ---------- Kyiv time helpers
 const kyivParts = d => Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Kyiv',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',weekday:'short',hourCycle:'h23'}).formatToParts(d).map(p=>[p.type,p.value]));
@@ -160,6 +164,10 @@ function parse(){
   const wd0 = days[0].wd - days[0].off; // weekday of base day
   return {days, ivs, wdOf:m=>((wd0-1+Math.floor(m/1440))%7+7)%7+1};
 }
+function verLabel(upd, d){ // '08.11.2026 00:53' -> '00:53' або '07.11 21:03'
+  const m = String(upd).match(/^(\d\d)\.(\d\d)\.(\d{4}) (\d\d:\d\d)/); if(!m) return '';
+  return `${m[3]}-${m[2]}-${m[1]}`===d.ymd ? m[4] : `${m[1]}.${m[2]} ${m[4]}`;
+}
 function inWindow(m){const a=toMin(cfg.time_from),b=toMin(cfg.time_to),x=((m%1440)+1440)%1440;return a===b||(a<b?x>=a&&x<b:x>=a||x<b)}
 function firstNotify(iv,wdOf){
   if(!cfg.enabled||(iv.kind==='maybe'&&!cfg.include_maybe)) return null;
@@ -177,10 +185,17 @@ function render(){
   const np = kyivParts(new Date()), today = `${np.year}-${np.month}-${np.day}`;
   const td = days.find(d=>d.ymd===today), nowAbs = td ? td.off*1440 + (+np.hour)*60 + (+np.minute) : -1;
   const shown = days.filter(d=>d.ymd>=today);
+  const liveUpd = (data&&data.fact&&data.fact.update)||'';
   $('days').innerHTML = shown.map(d=>{
     const lbl = d.ymd===today?'Сьогодні':(td&&d.off===td.off+1?'Завтра':d.date);
     const ns = d.ymd===today ? Math.floor(((+np.hour)*60+(+np.minute))/30) : -1;
-    return `<div class="day"><b>${lbl}, ${DN[d.wd-1]} ${d.date}</b><div class="bar">${d.slots.map((k,i)=>`<i class="${k||''}${i===ns?' now':''}"></i>`).join('')}</div>
+    const vs = (HIST[d.ymd]||[]).map(([l,s])=>({label:l, slots:[...s].map(c=>c==='x'?'off':c==='m'?'maybe':null)}));
+    const same = (a,b)=>a.length===b.length&&a.every((x,i)=>(x||null)===(b[i]||null));
+    if(!vs.length || !same(vs[vs.length-1].slots, d.slots)) vs.push({label:verLabel(liveUpd,d), slots:d.slots});
+    const many = vs.length>1;
+    return `<div class="day"><b>${lbl}, ${DN[d.wd-1]} ${d.date}</b>${vs.map((v,j)=>{const last=j===vs.length-1, prev=j?vs[j-1].slots:null;
+      return `<div class="ver${last?'':' old'}">${many?`<div class="vl">${v.label?'Графік від '+esc(v.label):'Графік'}${last?' · <b>актуальний</b>':''}${j?' · <span class="cm">змінено</span>':''}</div>`:''}
+      <div class="bar">${v.slots.map((k,i)=>`<i class="${k||''}${last&&i===ns?' now':''}${prev&&(prev[i]||null)!==(k||null)?' chg':''}"></i>`).join('')}</div></div>`}).join('')}
       <div class="ticks"><span>00</span><span>06</span><span>12</span><span>18</span></div></div>`}).join('');
   const minShown = shown.length ? shown[0].off*1440 : 0;
   $('iv').innerHTML = ivs.filter(iv=>iv.end>minShown).map(iv=>{
