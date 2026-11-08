@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Світло</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg:var(--tg-theme-secondary-bg-color,#f1f1f4);--card:var(--tg-theme-section-bg-color,var(--tg-theme-bg-color,#fff));
+  --ink:var(--tg-theme-text-color,#1c1c1e);--muted:var(--tg-theme-hint-color,#8e8e93);
+  --accent:var(--tg-theme-button-color,#2f80ed);--accent-ink:var(--tg-theme-button-text-color,#fff);
+  --line:rgba(127,127,127,.22);--on:rgba(52,199,89,.30);--off:#2c2c2e;--maybe:#f2b84b;--danger:#ff3b30}
+:root[data-scheme=dark]{--off:#ececf0;--on:rgba(52,199,89,.32)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+main{padding:12px 12px 90px;max-width:640px;margin:0 auto}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
+h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:4px 4px 8px}
+.head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.head b{font-size:17px}.head span{color:var(--muted);font-size:13px}
+.day{margin-top:14px}.day:first-child{margin-top:0}
+.day b{display:block;margin-bottom:6px;font-size:14px}
+.bar{display:grid;grid-template-columns:repeat(48,1fr);height:28px;border-radius:7px;overflow:hidden}
+.bar i{background:var(--on)}.bar i:nth-child(2n){box-shadow:inset -1px 0 0 var(--line)}
+.bar i.off{background:var(--off)}.bar i.maybe{background:var(--maybe)}
+.bar i.now{box-shadow:inset 0 0 0 2px var(--danger)}
+.ticks{display:grid;grid-template-columns:repeat(4,1fr);color:var(--muted);font-size:11px;margin-top:3px}
+ul{list-style:none;margin:10px 0 0;padding:0}
+li{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+li.past{opacity:.4}
+li .t{font-weight:600;font-variant-numeric:tabular-nums}
+li .d{color:var(--muted);font-size:13px}
+li .n{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
+li .now{color:var(--danger);font-weight:600}
+.legend{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:10px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;background:var(--c)}
+.field{margin-top:14px}.field:first-child{margin-top:0}
+.field>span{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+select,input,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:0;border-radius:10px;padding:10px 12px;outline:none;-webkit-appearance:none;appearance:none}
+textarea{min-height:80px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hm{display:flex;align-items:center;gap:4px}.hm select{text-align:center}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.days button,.chip{font:inherit;font-size:14px;border:0;border-radius:10px;padding:9px 0;background:var(--bg);color:var(--muted)}
+.days button.on{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.sw:first-child{border-top:0;padding-top:0}
+.sw input{width:46px;height:28px;border-radius:99px;background:var(--line);position:relative;padding:0;flex:none;transition:background .15s}
+.sw input::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .15s}
+.sw input:checked{background:#34c759}.sw input:checked::after{left:21px}
+.hint{color:var(--muted);font-size:12px;margin-top:6px}
+code{font-size:12px;background:var(--bg);padding:1px 4px;border-radius:4px}
+.btn{width:100%;font:inherit;font-weight:600;border:0;border-radius:12px;padding:13px;background:var(--bg);color:var(--accent);margin-top:4px}
+.warn{background:rgba(255,59,48,.12);color:var(--danger);border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+.muted{color:var(--muted);font-size:13px}
+#save{display:none}
+.notg #save{display:block;background:var(--accent);color:var(--accent-ink)}
+</style>
+</head>
+<body>
+<main>
+  <div class="warn" id="warn" hidden></div>
+
+  <h2>Графік</h2>
+  <section class="card">
+    <div class="head"><b id="title">Черга 2.1</b><span id="upd"></span></div>
+    <div id="days" style="margin-top:12px"><p class="muted">Завантажую графік…</p></div>
+    <div class="legend"><span style="--c:var(--on)">світло є</span><span style="--c:var(--off)">немає</span><span style="--c:var(--maybe)">можливо</span></div>
+    <ul id="iv"></ul>
+  </section>
+
+  <h2>Коли сповіщати</h2>
+  <section class="card">
+    <label class="sw"><span>Сповіщення</span><input type="checkbox" id="enabled"></label>
+    <div class="field"><span>Дні</span><div class="days" id="daysel"></div></div>
+    <div class="field"><span>Години</span>
+      <div class="two">
+        <div class="hm" data-for="time_from"><span class="muted">з&nbsp;</span><select class="h"></select>:<select class="m"></select></div>
+        <div class="hm" data-for="time_to"><span class="muted">до&nbsp;</span><select class="h"></select>:<select class="m"></select></div>
+      </div>
+      <div class="hint">Однаковий час — цілодобово. Якщо відключення почалось раніше, сповіщення прийде на початку проміжку.</div>
+    </div>
+    <div class="field"><span>Попередити заздалегідь</span>
+      <select id="before_minutes"><option value="0">Ні</option><option value="5">за 5 хв</option><option value="10">за 10 хв</option><option value="15">за 15 хв</option><option value="30">за 30 хв</option><option value="45">за 45 хв</option><option value="60">за 1 год</option><option value="120">за 2 год</option></select>
+    </div>
+    <label class="sw" style="margin-top:6px"><span>Про можливі відключення теж</span><input type="checkbox" id="include_maybe"></label>
+  </section>
+
+  <h2>Текст</h2>
+  <section class="card">
+    <div class="field"><span>Заголовок</span><input id="title_in" maxlength="80"></div>
+    <div class="field"><span>Коли зникає світло</span><textarea id="message" maxlength="1000"></textarea></div>
+    <div class="field" id="beforeField"><span>Попередження</span><textarea id="before_message" maxlength="1000"></textarea></div>
+    <div class="hint">Можна вставити: <code>{start}</code> <code>{end}</code> <code>{duration}</code> <code>{date}</code> <code>{day}</code> <code>{minutes}</code></div>
+  </section>
+
+  <h2>Черга</h2>
+  <section class="card">
+    <div class="field"><span>Регіон</span><select id="region"></select></div>
+    <div class="field"><span>Черга</span><select id="group"></select></div>
+  </section>
+
+  <h2>Mac</h2>
+  <section class="card">
+    <label class="sw"><span>Сповіщення на Mac</span><input type="checkbox" id="mac_notifications"></label>
+    <label class="sw"><span>Зі звуком</span><input type="checkbox" id="sound"></label>
+  </section>
+
+  <button class="btn" id="test">Зберегти й надіслати тест</button>
+  <button class="btn" id="save">Зберегти</button>
+</main>
+<script>
+const tg = window.Telegram && Telegram.WebApp;
+const inTG = !!(tg && tg.initData);
+const DATA_URL = r => `https://raw.githubusercontent.com/Baskerville42/outage-data-ua/main/data/${r}.json`;
+const REGIONS = {"kyiv":"м. Київ","kyiv-region":"Київщина","odesa":"Одещина","dnipro":"Дніпропетровщина"};
+const DN = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
+const SLOT = {no:['off','off'],first:['off',null],second:[null,'off'],maybe:['maybe','maybe'],mfirst:['maybe',null],msecond:[null,'maybe']};
+const DEFAULTS = {enabled:true,region:"kyiv",group:"2.1",days:[1,2,3,4,5,6,7],time_from:"00:00",time_to:"00:00",
+  title:"Світла немає",message:"Відключення {start}–{end} ({duration}).",before_minutes:0,
+  before_message:"Через {minutes} хв ({start}) вимкнуть світло.",include_maybe:false,mac_notifications:true,sound:true};
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,'0');
+const hm = m => pad(Math.floor(m/60)%24)+':'+pad(m%60);
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toMin = s => {const [h,m]=String(s||'0:0').split(':').map(Number);return (h||0)*60+(m||0)};
+const dur = m => {const h=Math.floor(m/60),r=m%60;return h&&r?`${h} год ${r} хв`:h?`${h} год`:`${r} хв`};
+
+function readConfig(){
+  try{
+    const m = location.hash.match(/c=([A-Za-z0-9_-]+)/); if(!m) return {...DEFAULTS};
+    let b = m[1].replace(/-/g,'+').replace(/_/g,'/'); while(b.length%4) b+='=';
+    const bytes = Uint8Array.from(atob(b), c=>c.charCodeAt(0));
+    return {...DEFAULTS, ...JSON.parse(new TextDecoder().decode(bytes))};
+  }catch(e){ return {...DEFAULTS}; }
+}
+let cfg = readConfig(), data = null;
+
+// ---------- Kyiv time helpers
+const kyivParts = d => Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Kyiv',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',weekday:'short',hourCycle:'h23'}).formatToParts(d).map(p=>[p.type,p.value]));
+const WD = {Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6,Sun:7};
+
+// ---------- schedule parsing (як у svitlo.py)
+function parse(){
+  const fact = (data&&data.fact&&data.fact.data)||{}, key='GPV'+cfg.group;
+  const keys = Object.keys(fact).sort((a,b)=>a-b).filter(k=>fact[k][key]);
+  if(!keys.length) return {days:[],ivs:[]};
+  const base = +keys[0];
+  const days = keys.map(k=>{
+    const p = kyivParts(new Date(k*1000)), off = Math.round((k-base)/86400);
+    const slots=[]; for(let h=1;h<=24;h++){const v=SLOT[fact[k][key][h]]||[null,null];slots.push(v[0],v[1])}
+    return {off, date:`${p.day}.${p.month}`, ymd:`${p.year}-${p.month}-${p.day}`, wd:WD[p.weekday], slots};
+  });
+  const ivs=[];
+  days.forEach(d=>d.slots.forEach((k,i)=>{
+    if(!k) return; const s=d.off*1440+i*30, last=ivs[ivs.length-1];
+    if(last&&last.kind===k&&last.end===s) last.end=s+30; else ivs.push({start:s,end:s+30,kind:k});
+  }));
+  const wd0 = days[0].wd - days[0].off; // weekday of base day
+  return {days, ivs, wdOf:m=>((wd0-1+Math.floor(m/1440))%7+7)%7+1};
+}
+function inWindow(m){const a=toMin(cfg.time_from),b=toMin(cfg.time_to),x=((m%1440)+1440)%1440;return a===b||(a<b?x>=a&&x<b:x>=a||x<b)}
+function firstNotify(iv,wdOf){
+  if(!cfg.enabled||(iv.kind==='maybe'&&!cfg.include_maybe)) return null;
+  const a=toMin(cfg.time_from), c=[iv.start];
+  for(let d=Math.floor(iv.start/1440)*1440; d<iv.end; d+=1440) c.push(d,d+a);
+  const ok=c.filter(x=>x>=iv.start&&x<iv.end&&cfg.days.includes(wdOf(x))&&inWindow(x));
+  return ok.length?Math.min(...ok):null;
+}
+
+function render(){
+  $('title').textContent = 'Черга '+cfg.group;
+  const upd = data&&data.fact&&data.fact.update; $('upd').textContent = upd?'ДТЕК: '+upd:'';
+  const {days,ivs,wdOf} = parse();
+  if(!days.length){$('days').innerHTML='<p class="muted">Графіка для цієї черги поки немає.</p>';$('iv').innerHTML='';return}
+  const np = kyivParts(new Date()), today = `${np.year}-${np.month}-${np.day}`;
+  const td = days.find(d=>d.ymd===today), nowAbs = td ? td.off*1440 + (+np.hour)*60 + (+np.minute) : -1;
+  const shown = days.filter(d=>d.ymd>=today);
+  $('days').innerHTML = shown.map(d=>{
+    const lbl = d.ymd===today?'Сьогодні':(td&&d.off===td.off+1?'Завтра':d.date);
+    const ns = d.ymd===today ? Math.floor(((+np.hour)*60+(+np.minute))/30) : -1;
+    return `<div class="day"><b>${lbl}, ${DN[d.wd-1]} ${d.date}</b><div class="bar">${d.slots.map((k,i)=>`<i class="${k||''}${i===ns?' now':''}"></i>`).join('')}</div>
+      <div class="ticks"><span>00</span><span>06</span><span>12</span><span>18</span></div></div>`}).join('');
+  const minShown = shown.length ? shown[0].off*1440 : 0;
+  $('iv').innerHTML = ivs.filter(iv=>iv.end>minShown).map(iv=>{
+    const past = nowAbs>=0 && iv.end<=nowAbs, active = nowAbs>=iv.start && nowAbs<iv.end;
+    const n = firstNotify(iv,wdOf), day = days.find(d=>d.off===Math.floor(iv.start/1440));
+    const bell = past?'':!n&&n!==0?'🔕':n===iv.start?'🔔':'🔔 о '+hm(n%1440);
+    return `<li class="${past?'past':''}"><span class="t">${hm(iv.start%1440)}–${hm(iv.end%1440)}</span>
+      <span class="d">${day?DN[day.wd-1]:''} · ${dur(iv.end-iv.start)}${iv.kind==='maybe'?' · можливо':''}</span>
+      ${active?'<span class="now">зараз</span>':''}<span class="n">${bell}</span></li>`}).join('') || '<li>💡 Відключень немає</li>';
+}
+
+async function load(){
+  try{
+    const r = await fetch(DATA_URL(cfg.region)+'?t='+Math.floor(Date.now()/60000)); data = await r.json();
+    const names = (data.preset&&data.preset.sch_names)||{};
+    const groups = Object.keys(names).filter(k=>k.startsWith('GPV')).map(k=>k.slice(3))
+      .sort((a,b)=>{const [a1,a2]=a.split('.').map(Number),[b1,b2]=b.split('.').map(Number);return a1-b1||a2-b2});
+    $('group').innerHTML = (groups.length?groups:[cfg.group]).map(g=>`<option>${esc(g)}</option>`).join('');
+    if(!groups.includes(cfg.group)&&groups.length) cfg.group = groups.includes('2.1')?'2.1':groups[0];
+    $('group').value = cfg.group;
+  }catch(e){ data=null; $('days').innerHTML='<p class="muted">Не вдалося завантажити графік. Перевір інтернет.</p>'; }
+  render();
+}
+
+// ---------- form
+function fill(){
+  $('region').innerHTML = Object.entries(REGIONS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+  $('region').value = cfg.region;
+  for(const k of ['enabled','include_maybe','mac_notifications','sound']) $(k).checked = !!cfg[k];
+  $('title_in').value = cfg.title; $('message').value = cfg.message; $('before_message').value = cfg.before_message;
+  const bm = $('before_minutes'); if(![...bm.options].some(o=>+o.value===+cfg.before_minutes)) bm.add(new Option(`за ${cfg.before_minutes} хв`, cfg.before_minutes));
+  bm.value = String(cfg.before_minutes);
+  renderDays(); renderHM(); toggleBefore();
+}
+function renderDays(){ $('daysel').innerHTML = DN.map((n,i)=>`<button type="button" class="${cfg.days.includes(i+1)?'on':''}" data-d="${i+1}">${n}</button>`).join(''); }
+function renderHM(){
+  document.querySelectorAll('.hm').forEach(w=>{
+    const v = toMin(cfg[w.dataset.for]), h=Math.floor(v/60), m=v%60;
+    const mins=[...Array(12).keys()].map(i=>i*5); if(!mins.includes(m)){mins.push(m);mins.sort((a,b)=>a-b)}
+    const H=w.querySelector('.h'), M=w.querySelector('.m');
+    H.innerHTML=[...Array(24).keys()].map(x=>`<option>${pad(x)}</option>`).join('');
+    M.innerHTML=mins.map(x=>`<option>${pad(x)}</option>`).join('');
+    H.value=pad(h); M.value=pad(m);
+    w.onchange=()=>{cfg[w.dataset.for]=H.value+':'+M.value; changed()};
+  });
+}
+function toggleBefore(){ $('beforeField').style.display = +cfg.before_minutes ? '' : 'none'; }
+function changed(){ render(); if(inTG) tg.MainButton.show(); }
+
+$('daysel').onclick = e => { const d=+e.target.dataset.d; if(!d) return;
+  cfg.days = cfg.days.includes(d)?cfg.days.filter(x=>x!==d):[...cfg.days,d].sort(); renderDays(); changed();
+  if(inTG&&tg.HapticFeedback) tg.HapticFeedback.selectionChanged(); };
+for(const k of ['enabled','include_maybe','mac_notifications','sound']) $(k).onchange = () => { cfg[k]=$(k).checked; changed(); };
+$('title_in').oninput = () => { cfg.title=$('title_in').value; changed(); };
+$('message').oninput = () => { cfg.message=$('message').value; changed(); };
+$('before_message').oninput = () => { cfg.before_message=$('before_message').value; changed(); };
+$('before_minutes').onchange = () => { cfg.before_minutes=+$('before_minutes').value; toggleBefore(); changed(); };
+$('group').onchange = () => { cfg.group=$('group').value; changed(); };
+$('region').onchange = () => { cfg.region=$('region').value; load(); changed(); };
+
+function submit(test){
+  const payload = JSON.stringify({action:'save', test:!!test, config:cfg});
+  if(new TextEncoder().encode(payload).length > 4096){ return alert('Тексти задовгі — скороти їх.'); }
+  if(!inTG){ return alert('Збереження працює лише всередині Telegram (кнопка «⚙️ Налаштування» в боті).'); }
+  tg.sendData(payload); // Telegram закриє міні-додаток і передасть дані боту
+}
+$('test').onclick = () => submit(true);
+$('save').onclick = () => submit(false);
+
+if(inTG){
+  tg.ready(); tg.expand();
+  document.documentElement.dataset.scheme = tg.colorScheme;
+  tg.onEvent('themeChanged', ()=>document.documentElement.dataset.scheme = tg.colorScheme);
+  tg.MainButton.setText('Зберегти'); tg.MainButton.onClick(()=>submit(false)); tg.MainButton.show();
+}else{
+  document.body.classList.add('notg');
+  if(matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.scheme='dark';
+  const w=$('warn'); w.hidden=false; w.textContent='Відкрий цю сторінку через кнопку «⚙️ Налаштування» в Telegram-боті, щоб зберігати зміни.';
+}
+fill(); load(); setInterval(render, 60000);
+</script>
+</body>
+</html>
