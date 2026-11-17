@@ -73,6 +73,12 @@ code{font-size:12px;background:var(--bg);padding:1px 4px;border-radius:4px}
     <ul id="iv"></ul>
   </section>
 
+  <h2>Фактично (датчик)</h2>
+  <section class="card">
+    <div id="pstate" class="muted">Датчик ще не підключено.</div>
+    <ul id="pout"></ul>
+  </section>
+
   <h2>Коли сповіщати</h2>
   <section class="card">
     <label class="sw"><span>Сповіщення</span><input type="checkbox" id="enabled"></label>
@@ -98,6 +104,15 @@ code{font-size:12px;background:var(--bg);padding:1px 4px;border-radius:4px}
     <div class="hint">Можна вставити: <code>{start}</code> <code>{end}</code> <code>{duration}</code> <code>{date}</code> <code>{day}</code> <code>{minutes}</code></div>
   </section>
 
+  <h2>Датчик світла</h2>
+  <section class="card">
+    <label class="sw"><span>Сповіщати, коли світло реально зникло / з'явилося</span><input type="checkbox" id="power_enabled"></label>
+    <label class="sw"><span>Враховувати дні й години</span><input type="checkbox" id="power_respect_filters"></label>
+    <div class="field"><span>Коли світло зникло</span><textarea id="power_off_message" maxlength="600"></textarea></div>
+    <div class="field"><span>Коли світло з'явилося</span><textarea id="power_on_message" maxlength="600"></textarea></div>
+    <div class="hint"><code>{time}</code> <code>{duration}</code> <code>{since}</code> <code>{planned}</code> — порівняння з графіком</div>
+  </section>
+
   <h2>Черга</h2>
   <section class="card">
     <div class="field"><span>Регіон</span><select id="region"></select></div>
@@ -115,7 +130,11 @@ code{font-size:12px;background:var(--bg);padding:1px 4px;border-radius:4px}
 </main>
 <script>
 const tg = window.Telegram && Telegram.WebApp;
-const inTG = !!(tg && tg.initData);
+// Відкрито в Telegram, якщо відома платформа. Кнопка з клавіатури бота (тільки так працює
+// sendData) відкриває міні-додаток з порожнім initData; з меню чи посилання initData є,
+// але sendData тоді недоступний.
+const inTG = !!(tg && tg.platform && tg.platform !== 'unknown');
+const canSend = inTG && !tg.initData;
 const DATA_URL = r => `https://raw.githubusercontent.com/Baskerville42/outage-data-ua/main/data/${r}.json`;
 const REGIONS = {"kyiv":"м. Київ","kyiv-region":"Київщина","odesa":"Одещина","dnipro":"Дніпропетровщина"};
 const DN = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
@@ -140,6 +159,7 @@ function readConfig(){
 }
 let cfg = readConfig(), data = null;
 const HIST = cfg._h || {}; delete cfg._h; // історія версій графіка від бота
+const POWER = cfg._p || null; delete cfg._p; // стан датчика на момент відкриття
 
 // ---------- Kyiv time helpers
 const kyivParts = d => Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Kyiv',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',weekday:'short',hourCycle:'h23'}).formatToParts(d).map(p=>[p.type,p.value]));
@@ -224,8 +244,13 @@ async function load(){
 function fill(){
   $('region').innerHTML = Object.entries(REGIONS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   $('region').value = cfg.region;
-  for(const k of ['enabled','include_maybe','mac_notifications','sound']) $(k).checked = !!cfg[k];
+  for(const k of ['enabled','include_maybe','mac_notifications','sound','power_enabled','power_respect_filters']) $(k).checked = cfg[k]!==false && !!(cfg[k]??true);
   $('title_in').value = cfg.title; $('message').value = cfg.message; $('before_message').value = cfg.before_message;
+  $('power_off_message').value = cfg.power_off_message||''; $('power_on_message').value = cfg.power_on_message||'';
+  if(POWER){
+    $('pstate').textContent = POWER.state==='off' ? '🔌 Світла немає з '+POWER.since : POWER.state==='on' ? '💡 Світло є з '+POWER.since : 'Датчик ще не надсилав даних.';
+    $('pout').innerHTML = (POWER.outages||[]).map(o=>`<li><span class="t">${esc(o.off)}–${o.on?esc(o.on):'…'}</span><span class="d">${o.on?'не було':'немає вже'} ${esc(o.duration)}</span></li>`).join('');
+  }
   const bm = $('before_minutes'); if(![...bm.options].some(o=>+o.value===+cfg.before_minutes)) bm.add(new Option(`за ${cfg.before_minutes} хв`, cfg.before_minutes));
   bm.value = String(cfg.before_minutes);
   renderDays(); renderHM(); toggleBefore();
@@ -248,7 +273,8 @@ function changed(){ render(); if(inTG) tg.MainButton.show(); }
 $('daysel').onclick = e => { const d=+e.target.dataset.d; if(!d) return;
   cfg.days = cfg.days.includes(d)?cfg.days.filter(x=>x!==d):[...cfg.days,d].sort(); renderDays(); changed();
   if(inTG&&tg.HapticFeedback) tg.HapticFeedback.selectionChanged(); };
-for(const k of ['enabled','include_maybe','mac_notifications','sound']) $(k).onchange = () => { cfg[k]=$(k).checked; changed(); };
+for(const k of ['enabled','include_maybe','mac_notifications','sound','power_enabled','power_respect_filters']) $(k).onchange = () => { cfg[k]=$(k).checked; changed(); };
+for(const k of ['power_off_message','power_on_message']) $(k).oninput = () => { cfg[k]=$(k).value; changed(); };
 $('title_in').oninput = () => { cfg.title=$('title_in').value; changed(); };
 $('message').oninput = () => { cfg.message=$('message').value; changed(); };
 $('before_message').oninput = () => { cfg.before_message=$('before_message').value; changed(); };
@@ -260,6 +286,7 @@ function submit(test){
   const payload = JSON.stringify({action:'save', test:!!test, config:cfg});
   if(new TextEncoder().encode(payload).length > 4096){ return alert('Тексти задовгі — скороти їх.'); }
   if(!inTG){ return alert('Збереження працює лише всередині Telegram (кнопка «⚙️ Налаштування» в боті).'); }
+  if(!canSend){ return tg.showAlert('Щоб зберегти, відкрий налаштування кнопкою «⚙️ Налаштування» внизу чату з ботом (над клавіатурою), а не через меню чи посилання.'); }
   tg.sendData(payload); // Telegram закриє міні-додаток і передасть дані боту
 }
 $('test').onclick = () => submit(true);
